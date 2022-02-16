@@ -51,6 +51,8 @@ input_filename: str = "input.raw"
 
 main_filter: filters.Filter = filters.text & filters.chat(
     chats = [config["listener_chat_id"]]
+) & filters.user(
+    users = config["owners"]
 ) & ~filters.edited
 
 
