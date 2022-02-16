@@ -1,0 +1,3 @@
+pyrogram >= 1.3.5
+pytgcalls==3.0.0.dev21
+git+https://github.com/MarshalX/yandex-music-api.git

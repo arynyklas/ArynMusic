@@ -1,0 +1,14 @@
+{
+    "api_id": 0,
+    "api_hash": "",
+    "owners": [
+        0
+    ],
+    "voice_chat_id": -100,
+    "listener_chat_id": -100,
+    "yandex": {
+        "username": "",
+        "password": "",
+        "token": ""
+    }
+}
