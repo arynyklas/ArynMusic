@@ -69,6 +69,7 @@ async def play_next() -> None:
 
     track: Track = music.start_radio() if music.is_playing_track else music.play_next()
 
+    music.current_track = track
     music.is_playing_track = False
 
     audio_original: str = "{uuid}.mp3".format(
@@ -101,6 +102,27 @@ async def play_next() -> None:
             group = config["voice_chat_id"]
         )
 
+    await update_playing_message(
+        track = track
+    )
+
+
+async def update_playing_message(track: Track) -> str:
+    music_full_title: str = texts["music_full_title"].format(
+        artists = ", ".join(track.artists_name()),
+        title = track.title
+    )
+
+    await client.edit_message_text(
+        chat_id = config["voice_chat_id"],
+        message_id = config["playing_message_id"],
+        text = texts["now_playing_text"].format(
+            music_full_title = music_full_title
+        )
+    )
+
+    return music_full_title
+
 
 @group_call.on_playout_ended
 async def on_playout_ended(_: GroupCallFile, *__: str):
@@ -113,21 +135,38 @@ async def play_command_handler(_: Client, message: types.Message) -> None:
     args: List[str] = message.text.split(" ", maxsplit=1)
 
     if len(args) < 2:
-        return await message.delete()
+        await message.reply_text(
+            text = texts["playing_wave"]
+        )
+
+        await play_next()
+
+        return
+
+    query: str = args[1]
 
     tracks: List[Track] = music.search_tracks(
-        query = args[1]
+        query = query
     )
 
     if len(tracks) < 1:
-        return await message.delete()
+        await message.reply_text(
+            text = texts["track_not_found"].format(
+                query = query
+            )
+        )
+
+        return
 
     track: Track = tracks[0]
 
-    music.on_replay = False
+    if music.on_replay:
+        music.on_replay = False
+
+    music.current_track = track
     music.is_playing_track = True
 
-    del tracks, args
+    del args, query, tracks
 
     message_: types.Message = await message.reply_text(
         text = texts["downloading"]
@@ -160,10 +199,13 @@ async def play_command_handler(_: Client, message: types.Message) -> None:
 
     remove(audio_original)
 
+    music_full_title: str = await update_playing_message(
+        track = track
+    )
+
     await message_.edit_text(
         text = texts["playing"].format(
-            artists = ", ".join(track.artists_name()),
-            title = track.title
+            music_full_title = music_full_title
         )
     )
 
@@ -173,6 +215,20 @@ async def play_command_handler(_: Client, message: types.Message) -> None:
         await group_call.start(
             group = config["voice_chat_id"]
         )
+
+
+@client.on_message(main_filter & cmd_filter("now_playing", "np"))
+async def now_playing_command_handler(_: Client, message: types.Message):
+    track: Track = music.current_track
+
+    await message.reply_text(
+        text = texts["now_playing"].format(
+            music_full_title = texts["music_full_title"].format(
+                artists = ", ".join(track.artists_name()),
+                title = track.title
+            )
+        )
+    )
 
 
 @client.on_message(main_filter & cmd_filter("volume", "v"))
@@ -249,6 +305,8 @@ async def skip_command_handler(_: Client, message: types.Message):
     await message.reply_text(
         text = texts["skipped"]
     )
+
+    music.is_playing_track = True
 
     await play_next()
 
