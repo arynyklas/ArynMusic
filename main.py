@@ -102,25 +102,9 @@ async def play_next() -> None:
         )
 
 
-def init_client_and_delete_message(func):
-    async def wrapper(client: Client, message: types.Message):
-        global group_call
-
-        if not group_call:
-            group_call = GroupCallFactory(
-                client = client
-            ).get_file_group_call()
-
-        await message.delete()
-
-        return await func(client, message)
-
-    return wrapper
-
-
 @group_call.on_playout_ended
 async def on_playout_ended(_: GroupCallFile, *__: str):
-    await group_call.stop_playout()
+    group_call.stop_playout()
     await play_next()
 
 
@@ -192,7 +176,6 @@ async def play_command_handler(_: Client, message: types.Message) -> None:
 
 
 @client.on_message(main_filter & cmd_filter("volume", "v"))
-@init_client_and_delete_message
 async def volume_command_handler(_: Client, message: types.Message):
     if len(message.command) < 2 or not message.command[1].isdigit():
         return await message.reply_text(
@@ -210,10 +193,20 @@ async def volume_command_handler(_: Client, message: types.Message):
     )
 
 
+@client.on_message(main_filter & cmd_filter("join", "j"))
+async def join_command_handler(_: Client, message: types.Message):
+    await group_call.start(
+        group = config["voice_chat_id"]
+    )
+
+    await message.reply_text(
+        text = texts["joined"]
+    )
+
+
 @client.on_message(main_filter & cmd_filter("leave", "l"))
-@init_client_and_delete_message
 async def leave_command_handler(_: Client, message: types.Message):
-    await group_call.stop()
+    await group_call.leave_current_group_call()
 
     await message.reply_text(
         text = texts["leaved"]
@@ -221,14 +214,15 @@ async def leave_command_handler(_: Client, message: types.Message):
 
 
 @client.on_message(main_filter & cmd_filter("rejoin", "rj"))
-@init_client_and_delete_message
 async def rejoin_command_handler(_: Client, message: types.Message):
     await group_call.reconnect()
-    await message.delete()
+
+    await message.reply_text(
+        text = texts["rejoined"]
+    )
 
 
 @client.on_message(main_filter & cmd_filter("replay", "rp"))
-@init_client_and_delete_message
 async def restart_command_handler(_: Client, message: types.Message):
     group_call.restart_playout()
 
@@ -240,7 +234,6 @@ async def restart_command_handler(_: Client, message: types.Message):
 
 
 @client.on_message(main_filter & cmd_filter("stop"))
-@init_client_and_delete_message
 async def stop_command_handler(_: Client, message: types.Message):
     group_call.stop_playout()
 
@@ -249,17 +242,18 @@ async def stop_command_handler(_: Client, message: types.Message):
     )
 
 
-@client.on_message(main_filter & cmd_filter("skip", "s"))
-@init_client_and_delete_message
+@client.on_message(main_filter & cmd_filter("skip", "s", "next", "x"))
 async def skip_command_handler(_: Client, message: types.Message):
     group_call.stop_playout()
 
+    await message.reply_text(
+        text = texts["skipped"]
+    )
+
     await play_next()
-    await message.delete()
 
 
 @client.on_message(main_filter & cmd_filter("pause", "p"))
-@init_client_and_delete_message
 async def pause_command_handler(_: Client, message: types.Message):
     group_call.pause_playout()
 
@@ -269,7 +263,6 @@ async def pause_command_handler(_: Client, message: types.Message):
 
 
 @client.on_message(main_filter & cmd_filter("resume", "rs"))
-@init_client_and_delete_message
 async def resume_command_handler(_: Client, message: types.Message):
     group_call.resume_playout()
 
